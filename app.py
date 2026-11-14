@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from difflib import get_close_matches
+import requests
 
 st.set_page_config(page_title="KitchenFlow", page_icon="🍳", layout="wide")
 
@@ -34,7 +35,7 @@ TRANSLATIONS = {
         "fresh": "Fresh",
         "frozen": "Frozen",
         "delete": "Delete",
-        "choose_recipe": "Search or choose a recipe",
+        "choose_recipe": "Search recipes",
         "ingredients": "Ingredients",
         "instructions": "Instructions",
         "use_instead": "Use this instead",
@@ -47,9 +48,9 @@ TRANSLATIONS = {
         "current_place": "Current Place",
         "add_place": "Add new place (home, store, etc.)",
         "places": "Places",
-        "search_recipes": "Type to search recipes",
+        "search_recipes": "Type a recipe or ingredient to search the web",
         "nutrition_goals": "Nutrition Goals",
-        "goal_note": "Goals help filter and highlight recipes"
+        "goal_note": "Goals help highlight suitable recipes"
     }
 }
 
@@ -88,6 +89,38 @@ def guess_unit(item_name):
         return "count"
     return "count"
 
+def search_web_recipes(query):
+    """Pull recipes from TheMealDB free API"""
+    if not query or len(query) < 2:
+        return []
+    try:
+        url = f"https://www.themealdb.com/api/json/v1/1/search.php?s={query}"
+        response = requests.get(url, timeout=10)
+        data = response.json()
+        meals = data.get("meals")
+        if not meals:
+            return []
+        results = []
+        for meal in meals[:8]:  # Limit to 8 results
+            ingredients = []
+            for i in range(1, 21):
+                ing = meal.get(f"strIngredient{i}")
+                measure = meal.get(f"strMeasure{i}")
+                if ing and ing.strip():
+                    ingredients.append(f"{measure.strip() if measure else ''} {ing.strip()}".strip())
+            results.append({
+                "name": meal.get("strMeal", "Unknown"),
+                "category": meal.get("strCategory", ""),
+                "area": meal.get("strArea", ""),
+                "ingredients": ingredients,
+                "instructions": meal.get("strInstructions", "No instructions available."),
+                "image": meal.get("strMealThumb", "")
+            })
+        return results
+    except Exception as e:
+        st.error(f"Could not fetch recipes: {e}")
+        return []
+
 # ---------- Session State ----------
 if "language" not in st.session_state:
     st.session_state.language = None
@@ -118,105 +151,6 @@ t = TRANSLATIONS[st.session_state.language]
 st.title(t["title"])
 
 unit_options = ["lbs", "cups", "count", "oz", "cloves", "gallons"] if st.session_state.measurement == "US" else ["kg", "liters", "count", "grams", "cloves", "gallons"]
-
-SAMPLE_RECIPES = {
-    "Simple Chicken Stir-Fry": {
-        "ingredients": {
-            "chicken breast": {"qty": 1.5, "unit": "lbs", "acceptable": ["chicken thighs", "chicken wings", "ground chicken"]},
-            "broccoli": {"qty": 2, "unit": "cups", "acceptable": []},
-            "soy sauce": {"qty": 0.25, "unit": "cup", "acceptable": []},
-            "garlic": {"qty": 3, "unit": "cloves", "acceptable": []},
-            "rice": {"qty": 1.5, "unit": "cups", "acceptable": []}
-        },
-        "instructions": [
-            "Cook the rice according to package directions and set aside.",
-            "Cut the chicken into bite-sized pieces.",
-            "Heat a large pan or wok over medium-high heat with a little oil.",
-            "Add the chicken and cook until no longer pink, about 5–7 minutes.",
-            "Add the garlic and broccoli. Stir-fry for 3–4 minutes until broccoli is tender-crisp.",
-            "Pour in the soy sauce and stir everything together for 1 minute.",
-            "Serve over the cooked rice."
-        ],
-        "tags": ["protein", "balanced"]
-    },
-    "Beef & Vegetable Skillet": {
-        "ingredients": {
-            "ground beef": {"qty": 1.0, "unit": "lbs", "acceptable": ["ground turkey"]},
-            "bell peppers": {"qty": 2, "unit": "count", "acceptable": []},
-            "onion": {"qty": 1, "unit": "count", "acceptable": []},
-            "tomato sauce": {"qty": 1, "unit": "cup", "acceptable": []},
-            "rice": {"qty": 1, "unit": "cups", "acceptable": []}
-        },
-        "instructions": [
-            "Cook the rice according to package directions.",
-            "Brown the ground beef in a skillet and drain excess fat.",
-            "Add chopped onion and bell peppers. Cook until soft.",
-            "Stir in tomato sauce and simmer 5 minutes.",
-            "Serve over rice."
-        ],
-        "tags": ["protein", "balanced"]
-    },
-    "Garlic Butter Pasta": {
-        "ingredients": {
-            "pasta": {"qty": 1, "unit": "lbs", "acceptable": []},
-            "garlic": {"qty": 4, "unit": "cloves", "acceptable": []},
-            "butter": {"qty": 0.25, "unit": "cup", "acceptable": []},
-            "cheese": {"qty": 0.5, "unit": "cup", "acceptable": []}
-        },
-        "instructions": [
-            "Cook pasta according to package directions.",
-            "Melt butter in a pan and add minced garlic. Cook 1 minute.",
-            "Toss cooked pasta with the garlic butter.",
-            "Top with cheese and serve."
-        ],
-        "tags": ["comfort", "higher calorie"]
-    },
-    "Baked Salmon with Vegetables": {
-        "ingredients": {
-            "salmon": {"qty": 1.5, "unit": "lbs", "acceptable": []},
-            "broccoli": {"qty": 2, "unit": "cups", "acceptable": []},
-            "sweet potato": {"qty": 2, "unit": "count", "acceptable": []},
-            "olive oil": {"qty": 2, "unit": "tbsp", "acceptable": []}
-        },
-        "instructions": [
-            "Preheat oven to 400°F (200°C).",
-            "Place salmon and chopped vegetables on a baking sheet.",
-            "Drizzle with olive oil and season.",
-            "Bake 15–20 minutes until salmon flakes easily.",
-            "Serve hot."
-        ],
-        "tags": ["high protein", "omega-3", "lower sodium"]
-    },
-    "Quinoa Veggie Bowl": {
-        "ingredients": {
-            "quinoa": {"qty": 1, "unit": "cup", "acceptable": []},
-            "spinach": {"qty": 2, "unit": "cups", "acceptable": []},
-            "avocado": {"qty": 1, "unit": "count", "acceptable": []},
-            "bell peppers": {"qty": 1, "unit": "count", "acceptable": []}
-        },
-        "instructions": [
-            "Cook quinoa according to package directions.",
-            "Chop vegetables and avocado.",
-            "Mix everything in a bowl.",
-            "Season lightly and serve."
-        ],
-        "tags": ["vegetarian", "high fiber", "potassium"]
-    },
-    "Oatmeal with Fruit": {
-        "ingredients": {
-            "oats": {"qty": 1, "unit": "cup", "acceptable": []},
-            "milk": {"qty": 1, "unit": "cup", "acceptable": []},
-            "banana": {"qty": 1, "unit": "count", "acceptable": []},
-            "berries": {"qty": 0.5, "unit": "cup", "acceptable": []}
-        },
-        "instructions": [
-            "Cook oats with milk on the stove or microwave.",
-            "Slice banana and add berries.",
-            "Stir and serve warm."
-        ],
-        "tags": ["breakfast", "fiber", "balanced"]
-    }
-}
 
 # ---------- Sidebar ----------
 with st.sidebar:
@@ -322,40 +256,26 @@ with tab2:
     if st.session_state.goals:
         st.info(f"Active goals: {', '.join(st.session_state.goals)}")
 
-    search = st.text_input(t["search_recipes"], placeholder="Type recipe name...")
-    recipe_names = list(SAMPLE_RECIPES.keys())
+    search = st.text_input(t["search_recipes"], placeholder="e.g. chicken, pasta, salmon, soup...")
     if search:
-        filtered = [r for r in recipe_names if search.lower() in r.lower()]
+        with st.spinner("Searching recipes..."):
+            web_recipes = search_web_recipes(search)
+        if web_recipes:
+            recipe_names = [r["name"] for r in web_recipes]
+            selected_name = st.selectbox("Select a recipe", recipe_names)
+            selected = next(r for r in web_recipes if r["name"] == selected_name)
+            st.write(f"**{selected['name']}**  ({selected['category']} — {selected['area']})")
+            if selected["image"]:
+                st.image(selected["image"], width=300)
+            st.write(f"### {t['ingredients']}")
+            for ing in selected["ingredients"]:
+                st.write(f"• {ing}")
+            st.write(f"### {t['instructions']}")
+            st.write(selected["instructions"])
+        else:
+            st.info("No recipes found. Try a different search term (e.g. 'chicken', 'beef', 'pasta').")
     else:
-        filtered = recipe_names
-
-    # Simple goal filtering hint
-    if "Cut sodium" in st.session_state.goals:
-        st.caption("Preferring lower-sodium style recipes where possible.")
-    if "Add potassium" in st.session_state.goals:
-        st.caption("Highlighting recipes with potassium-rich foods (e.g. spinach, sweet potato, banana).")
-
-    if filtered:
-        recipe_name = st.selectbox(t["choose_recipe"], filtered)
-        recipe = SAMPLE_RECIPES[recipe_name]
-        st.write(f"### {t['ingredients']}")
-        inventory_items = [i.lower() for i in inv["Item"].tolist()] if not inv.empty else []
-        for ing, details in recipe["ingredients"].items():
-            st.write(f"**{t['recommended']}:** {ing}")
-            found = next((acc for acc in details.get("acceptable", []) if any(acc in i for i in inventory_items)), None)
-            if found:
-                st.success(f"**{t['acceptable']}:** {found}")
-            else:
-                st.write(f"• {details['qty']} {details['unit']} {ing}")
-            if st.session_state.allow_subs:
-                st.text_input(t["use_instead"], key=f"sub_{ing}", placeholder="optional")
-        st.write(f"### {t['instructions']}")
-        for i, step in enumerate(recipe.get("instructions", []), 1):
-            st.write(f"{i}. {step}")
-        if "tags" in recipe:
-            st.caption("Tags: " + ", ".join(recipe["tags"]))
-    else:
-        st.info("No recipes match your search. More recipes can be added later.")
+        st.info("Type a recipe or main ingredient above to search the web.")
 
 with tab3:
     st.subheader(t["missing_items"])
@@ -363,17 +283,12 @@ with tab3:
 
 with tab4:
     st.subheader(t["recipes"])
-    for name, data in SAMPLE_RECIPES.items():
-        with st.expander(name):
-            st.write("**Ingredients:**", ", ".join(data["ingredients"].keys()))
-            for i, step in enumerate(data.get("instructions", []), 1):
-                st.write(f"{i}. {step}")
+    st.info("Use the Meal Plan tab to search and view recipes from the web.")
 
 with tab5:
     st.subheader(t["helper_title"])
     st.write(f"Current place: **{st.session_state.current_place}**")
+    st.write("Search recipes in the Meal Plan tab — they are pulled live from the web (TheMealDB).")
     st.write("Set nutrition goals in the sidebar.")
-    st.write("Search recipes by typing in the Meal Plan tab.")
-    st.write("Note: Live web recipe pulling can be added later with an API. For now, use the built-in recipes or paste ideas manually.")
 
-st.caption("Nutrition goals + expanded recipes added.")
+st.caption("Live web recipe search added (TheMealDB).")
