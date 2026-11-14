@@ -33,6 +33,7 @@ TRANSLATIONS = {
         "fresh_frozen": "Fresh or Frozen",
         "fresh": "Fresh",
         "frozen": "Frozen",
+        "delete": "Delete",
         "choose_recipe": "Choose a base recipe",
         "ingredients": "Ingredients",
         "instructions": "Instructions",
@@ -41,7 +42,8 @@ TRANSLATIONS = {
         "acceptable": "Acceptable replacement you have",
         "missing_items": "Shopping List (missing items)",
         "helper_title": "Helper",
-        "select_specific": "Select a specific item"
+        "select_specific": "Select a specific item",
+        "no_items": "No items in inventory yet."
     }
 }
 
@@ -123,22 +125,6 @@ SAMPLE_RECIPES = {
             "Pour in the soy sauce and stir everything together for 1 minute.",
             "Serve over the cooked rice."
         ]
-    },
-    "Beef & Vegetable Skillet": {
-        "ingredients": {
-            "ground beef": {"qty": 1.0, "unit": "lbs", "acceptable": ["ground turkey"]},
-            "bell peppers": {"qty": 2, "unit": "count", "acceptable": []},
-            "onion": {"qty": 1, "unit": "count", "acceptable": []},
-            "tomato sauce": {"qty": 1, "unit": "cup", "acceptable": []},
-            "rice": {"qty": 1, "unit": "cups", "acceptable": []}
-        },
-        "instructions": [
-            "Cook the rice according to package directions.",
-            "In a large skillet, brown the ground beef over medium heat. Drain excess fat.",
-            "Add the chopped onion and bell peppers. Cook until softened, about 5 minutes.",
-            "Stir in the tomato sauce and simmer for 5 minutes.",
-            "Serve the beef mixture over the rice."
-        ]
     }
 }
 
@@ -190,10 +176,21 @@ with tab1:
             st.session_state.inventory = pd.concat([st.session_state.inventory, new_row], ignore_index=True)
             st.rerun()
 
-    if not st.session_state.inventory.empty:
-        st.data_editor(st.session_state.inventory, num_rows="dynamic", use_container_width=True)
+    st.write("---")
+    st.write("### Current Items")
+    if st.session_state.inventory.empty:
+        st.info(t["no_items"])
     else:
-        st.info("Add items you currently have.")
+        for idx, row in st.session_state.inventory.iterrows():
+            col1, col2, col3 = st.columns([4, 2, 1])
+            with col1:
+                st.write(f"**{row['Item']}** — {row['Quantity']} {row['Unit']} ({row['Fresh/Frozen']})")
+            with col2:
+                st.write(f"{row['Location']} | Exp: {row['Expiration']}")
+            with col3:
+                if st.button(t["delete"], key=f"del_{idx}"):
+                    st.session_state.inventory = st.session_state.inventory.drop(idx).reset_index(drop=True)
+                    st.rerun()
 
 with tab2:
     st.subheader(t["meal_plan"])
@@ -219,19 +216,18 @@ with tab2:
 
 with tab3:
     st.subheader(t["missing_items"])
-    st.info("Shopping list respects your specific items and fresh/frozen choices.")
+    st.info("Shopping list respects your specific items.")
 
 with tab4:
     st.subheader(t["recipes"])
     for name, data in SAMPLE_RECIPES.items():
         with st.expander(name):
             st.write("**Ingredients:**", ", ".join(data["ingredients"].keys()))
-            st.write("**Instructions:**")
             for i, step in enumerate(data.get("instructions", []), 1):
                 st.write(f"{i}. {step}")
 
 with tab5:
     st.subheader(t["helper_title"])
-    st.write("Pick a recipe in the Meal Plan tab to see full instructions.")
+    st.write("Use the Delete button next to any item to remove it from your inventory.")
 
-st.caption("Recipe instructions added.")
+st.caption("Simple delete buttons added for inventory items.")
