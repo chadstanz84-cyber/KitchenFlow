@@ -178,13 +178,3 @@ with tab5:
     st.write("Type an item — clear misspellings will be corrected. Close-but-valid names are left alone.")
 
 st.caption("Spelling correction + recommended vs acceptable replacements added.")
-How it behaves now
-Type “chiken” → it suggests and uses “chicken”.
-Type “mlik” → it corrects to “milk”.
-Type “chicken thighs” when a recipe wants “chicken breast” → the Meal Plan tab will show both the recommended item and that you have an acceptable replacement.
-Update the file, refresh the app, and test a misspelling plus a chicken thighs vs breast case. Let me know what you want adjusted next.
-
-
-fds
-
-No file chosen
