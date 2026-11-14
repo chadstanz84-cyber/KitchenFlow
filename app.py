@@ -47,7 +47,9 @@ TRANSLATIONS = {
         "current_place": "Current Place",
         "add_place": "Add new place (home, store, etc.)",
         "places": "Places",
-        "search_recipes": "Type to search recipes"
+        "search_recipes": "Type to search recipes",
+        "nutrition_goals": "Nutrition Goals",
+        "goal_note": "Goals help filter and highlight recipes"
     }
 }
 
@@ -62,7 +64,8 @@ ITEM_SUGGESTIONS = {
 KNOWN_ITEMS = [
     "chicken breast", "chicken thighs", "chicken wings", "chicken drumsticks", "whole chicken", "ground chicken",
     "ground beef", "beef", "milk", "whole milk", "broccoli", "onion", "yellow onion", "garlic", "rice",
-    "soy sauce", "bell peppers", "tomato sauce", "eggs", "butter", "cheese", "bread", "soda", "chips"
+    "soy sauce", "bell peppers", "tomato sauce", "eggs", "butter", "cheese", "bread", "soda", "chips",
+    "salmon", "quinoa", "spinach", "sweet potato", "avocado", "oats"
 ]
 
 def correct_spelling(word):
@@ -77,11 +80,11 @@ def guess_unit(item_name):
     name = item_name.lower()
     if any(x in name for x in ["milk", "water", "juice", "oil", "soda"]):
         return "gallons" if st.session_state.get("measurement", "US") == "US" else "liters"
-    if any(x in name for x in ["chicken", "beef", "pork", "meat", "fish"]):
+    if any(x in name for x in ["chicken", "beef", "pork", "meat", "fish", "salmon"]):
         return "lbs" if st.session_state.get("measurement", "US") == "US" else "kg"
     if "garlic" in name:
         return "cloves"
-    if any(x in name for x in ["onion", "pepper", "egg", "apple", "banana", "potato", "bread"]):
+    if any(x in name for x in ["onion", "pepper", "egg", "apple", "banana", "potato", "bread", "avocado"]):
         return "count"
     return "count"
 
@@ -100,6 +103,8 @@ if "allow_subs" not in st.session_state:
     st.session_state.allow_subs = True
 if "show_nutrition" not in st.session_state:
     st.session_state.show_nutrition = False
+if "goals" not in st.session_state:
+    st.session_state.goals = []
 
 if st.session_state.language is None:
     st.title("KitchenFlow")
@@ -131,7 +136,8 @@ SAMPLE_RECIPES = {
             "Add the garlic and broccoli. Stir-fry for 3–4 minutes until broccoli is tender-crisp.",
             "Pour in the soy sauce and stir everything together for 1 minute.",
             "Serve over the cooked rice."
-        ]
+        ],
+        "tags": ["protein", "balanced"]
     },
     "Beef & Vegetable Skillet": {
         "ingredients": {
@@ -147,7 +153,8 @@ SAMPLE_RECIPES = {
             "Add chopped onion and bell peppers. Cook until soft.",
             "Stir in tomato sauce and simmer 5 minutes.",
             "Serve over rice."
-        ]
+        ],
+        "tags": ["protein", "balanced"]
     },
     "Garlic Butter Pasta": {
         "ingredients": {
@@ -161,7 +168,53 @@ SAMPLE_RECIPES = {
             "Melt butter in a pan and add minced garlic. Cook 1 minute.",
             "Toss cooked pasta with the garlic butter.",
             "Top with cheese and serve."
-        ]
+        ],
+        "tags": ["comfort", "higher calorie"]
+    },
+    "Baked Salmon with Vegetables": {
+        "ingredients": {
+            "salmon": {"qty": 1.5, "unit": "lbs", "acceptable": []},
+            "broccoli": {"qty": 2, "unit": "cups", "acceptable": []},
+            "sweet potato": {"qty": 2, "unit": "count", "acceptable": []},
+            "olive oil": {"qty": 2, "unit": "tbsp", "acceptable": []}
+        },
+        "instructions": [
+            "Preheat oven to 400°F (200°C).",
+            "Place salmon and chopped vegetables on a baking sheet.",
+            "Drizzle with olive oil and season.",
+            "Bake 15–20 minutes until salmon flakes easily.",
+            "Serve hot."
+        ],
+        "tags": ["high protein", "omega-3", "lower sodium"]
+    },
+    "Quinoa Veggie Bowl": {
+        "ingredients": {
+            "quinoa": {"qty": 1, "unit": "cup", "acceptable": []},
+            "spinach": {"qty": 2, "unit": "cups", "acceptable": []},
+            "avocado": {"qty": 1, "unit": "count", "acceptable": []},
+            "bell peppers": {"qty": 1, "unit": "count", "acceptable": []}
+        },
+        "instructions": [
+            "Cook quinoa according to package directions.",
+            "Chop vegetables and avocado.",
+            "Mix everything in a bowl.",
+            "Season lightly and serve."
+        ],
+        "tags": ["vegetarian", "high fiber", "potassium"]
+    },
+    "Oatmeal with Fruit": {
+        "ingredients": {
+            "oats": {"qty": 1, "unit": "cup", "acceptable": []},
+            "milk": {"qty": 1, "unit": "cup", "acceptable": []},
+            "banana": {"qty": 1, "unit": "count", "acceptable": []},
+            "berries": {"qty": 0.5, "unit": "cup", "acceptable": []}
+        },
+        "instructions": [
+            "Cook oats with milk on the stove or microwave.",
+            "Slice banana and add berries.",
+            "Stir and serve warm."
+        ],
+        "tags": ["breakfast", "fiber", "balanced"]
     }
 }
 
@@ -181,12 +234,24 @@ with st.sidebar:
         st.session_state.current_place = new_place
         st.rerun()
 
+    st.subheader(t["nutrition_goals"])
+    goal_options = ["Gain weight", "Lose weight", "Higher protein", "Add potassium", "Cut sodium", "Cut sugars", "Higher fiber", "Lower saturated fat"]
+    st.session_state.goals = st.multiselect("Select your goals", goal_options, default=st.session_state.goals)
+    if st.session_state.goals:
+        st.caption(t["goal_note"])
+
     st.session_state.show_nutrition = st.toggle(t["show_nutrition"], value=st.session_state.show_nutrition)
     st.session_state.allow_subs = st.toggle(t["allow_subs"], value=st.session_state.allow_subs)
     meas = st.radio(t["measurements"], [t["us"], t["metric"]])
     st.session_state.measurement = "US" if "US" in meas else "Metric"
 
-# Current inventory (strictly separated by place)
+    st.subheader(t["allergies"])
+    new_allergy = st.text_input(t["add_allergy"])
+    if st.button(t["add"]) and new_allergy:
+        if new_allergy.lower() not in [a.lower() for a in st.session_state.allergies]:
+            st.session_state.allergies.append(new_allergy)
+            st.rerun()
+
 current_inv = st.session_state.places[st.session_state.current_place]
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([t["inventory"], t["meal_plan"], t["shopping_list"], t["recipes"], t["helper"]])
@@ -254,12 +319,21 @@ with tab1:
 
 with tab2:
     st.subheader(t["meal_plan"])
+    if st.session_state.goals:
+        st.info(f"Active goals: {', '.join(st.session_state.goals)}")
+
     search = st.text_input(t["search_recipes"], placeholder="Type recipe name...")
     recipe_names = list(SAMPLE_RECIPES.keys())
     if search:
         filtered = [r for r in recipe_names if search.lower() in r.lower()]
     else:
         filtered = recipe_names
+
+    # Simple goal filtering hint
+    if "Cut sodium" in st.session_state.goals:
+        st.caption("Preferring lower-sodium style recipes where possible.")
+    if "Add potassium" in st.session_state.goals:
+        st.caption("Highlighting recipes with potassium-rich foods (e.g. spinach, sweet potato, banana).")
 
     if filtered:
         recipe_name = st.selectbox(t["choose_recipe"], filtered)
@@ -278,8 +352,10 @@ with tab2:
         st.write(f"### {t['instructions']}")
         for i, step in enumerate(recipe.get("instructions", []), 1):
             st.write(f"{i}. {step}")
+        if "tags" in recipe:
+            st.caption("Tags: " + ", ".join(recipe["tags"]))
     else:
-        st.info("No recipes match your search.")
+        st.info("No recipes match your search. More recipes can be added later.")
 
 with tab3:
     st.subheader(t["missing_items"])
@@ -296,7 +372,8 @@ with tab4:
 with tab5:
     st.subheader(t["helper_title"])
     st.write(f"Current place: **{st.session_state.current_place}**")
-    st.write("Inventory is completely separate for each place.")
-    st.write("Use the search box in Meal Plan to find recipes by typing.")
+    st.write("Set nutrition goals in the sidebar.")
+    st.write("Search recipes by typing in the Meal Plan tab.")
+    st.write("Note: Live web recipe pulling can be added later with an API. For now, use the built-in recipes or paste ideas manually.")
 
-st.caption("Recipe search + confirmed separate inventories per place.")
+st.caption("Nutrition goals + expanded recipes added.")
