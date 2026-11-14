@@ -16,11 +16,13 @@ if "allow_subs" not in st.session_state:
     st.session_state.allow_subs = True
 if "show_nutrition" not in st.session_state:
     st.session_state.show_nutrition = False
+if "substitutions" not in st.session_state:
+    st.session_state.substitutions = {}
 
 # ---------- Sample Recipes ----------
 SAMPLE_RECIPES = {
     "Simple Chicken Stir-Fry": {
-        "main": "chicken",
+        "main": "chicken breast",
         "base_qty": 1.5,
         "ingredients": {
             "chicken breast": 1.5,
@@ -33,7 +35,7 @@ SAMPLE_RECIPES = {
         "nutrition_per_serving": {"protein": 35, "iron": 1.2, "magnesium": 40, "potassium": 450, "sodium": 650, "calories": 420}
     },
     "Beef & Vegetable Skillet": {
-        "main": "beef",
+        "main": "ground beef",
         "base_qty": 1.0,
         "ingredients": {
             "ground beef": 1.0,
@@ -50,31 +52,24 @@ SAMPLE_RECIPES = {
 def smart_display(qty, item, unit):
     item_lower = item.lower()
     if "onion" in item_lower:
-        if qty <= 1.2:
-            return "1 onion"
-        elif qty <= 2.2:
-            return "2 onions"
-        else:
-            return f"{round(qty)} onions"
+        n = round(qty)
+        return f"{n} onion" if n == 1 else f"{n} onions"
     if "bell pepper" in item_lower or "pepper" in item_lower:
         n = round(qty)
-        size = "medium" if n <= 2 else "large"
-        return f"{n} {size} bell pepper{'s' if n > 1 else ''}"
+        return f"{n} bell pepper" if n == 1 else f"{n} bell peppers"
     if "garlic" in item_lower:
         return f"{round(qty)} cloves garlic"
     if unit in ["lbs", "lb"]:
-        if qty < 0.4:
-            return f"about {qty:.1f} lb {item}"
         rounded = round(qty * 4) / 4
-        if abs(rounded - qty) < 0.15:
-            nice = str(rounded).replace(".0", "").replace(".5", "½").replace(".25", "¼").replace(".75", "¾")
-            return f"about {nice} lbs {item}"
-        return f"a little more than {round(qty,1)} lbs {item}"
+        nice = str(rounded).replace(".0", "").replace(".5", "½").replace(".25", "¼").replace(".75", "¾")
+        return f"about {nice} lbs {item}"
     if unit in ["cups", "cup"]:
         rounded = round(qty * 4) / 4
         nice = str(rounded).replace(".0", "").replace(".5", "½").replace(".25", "¼").replace(".75", "¾")
         return f"about {nice} cup{'s' if rounded != 1 else ''} {item}"
-    if unit == "count" or unit == "units":
+    if unit == "gallons":
+        return f"about {qty:.1f} gallons {item}"
+    if unit in ["count", "units"]:
         n = round(qty)
         return f"{n} {item}"
     return f"about {qty:.1f} {unit} {item}"
@@ -90,7 +85,7 @@ with st.sidebar:
     if st.button("Add") and new_allergy:
         if new_allergy.lower() not in [a.lower() for a in st.session_state.allergies]:
             st.session_state.allergies.append(new_allergy)
-    for a in st.session_state.allergies:
+    for a in list(st.session_state.allergies):
         col1, col2 = st.columns([3,1])
         col1.write(a)
         if col2.button("✕", key=f"del_{a}"):
@@ -110,7 +105,7 @@ with tab1:
         c1, c2, c3, c4, c5 = st.columns(5)
         item = c1.text_input("Item")
         qty = c2.number_input("Quantity", min_value=0.0, step=0.1, value=1.0)
-        unit = c3.selectbox("Unit", ["lbs", "cups", "count", "oz", "cloves"])
+        unit = c3.selectbox("Unit", ["lbs", "cups", "count", "oz", "cloves", "gallons"])
         loc = c4.selectbox("Location", ["Fridge", "Freezer", "Pantry"])
         exp = c5.date_input("Expiration", value=datetime.now() + timedelta(days=7))
         if st.form_submit_button("Add Item") and item:
@@ -128,34 +123,46 @@ with tab1:
         st.info("Add items you currently have.")
 
 with tab2:
-    st.subheader("Meal Suggestions")
+    st.subheader("Meal Plan")
     selected_recipe = st.selectbox("Choose a base recipe", list(SAMPLE_RECIPES.keys()))
     recipe = SAMPLE_RECIPES[selected_recipe]
 
-    excess_qty = recipe["base_qty"]
-    if not st.session_state.inventory.empty:
-        matches = st.session_state.inventory[st.session_state.inventory["Item"].str.contains(recipe["main"], case=False, na=False)]
-        if not matches.empty:
-            excess_qty = float(matches.iloc[0]["Quantity"])
-            st.success(f"Using the {smart_display(excess_qty, matches.iloc[0]['Item'], 'lbs')} you already have.")
+    st.write("### Ingredients (exact recipe)")
+    st.write("You can substitute anything below with what you already have.")
 
-    scale = excess_qty / recipe["base_qty"] if recipe["base_qty"] else 1
-    st.write("### Ingredients")
     for ing, base in recipe["ingredients"].items():
-        scaled = base * scale
         unit = recipe["units"].get(ing, "units")
+        display = smart_display(base, ing, unit)
+
+        # Check for exact or close inventory match
+        have_exact = False
+        if not st.session_state.inventory.empty:
+            exact = st.session_state.inventory[st.session_state.inventory["Item"].str.lower() == ing.lower()]
+            if not exact.empty:
+                have_exact = True
+
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            if have_exact:
+                st.success(f"✓ {display} (you have this)")
+            else:
+                st.write(f"• {display}")
+
+        with col2:
+            if st.session_state.allow_subs:
+                sub_key = f"sub_{selected_recipe}_{ing}"
+                current_sub = st.session_state.substitutions.get(sub_key, "")
+                new_sub = st.text_input("Use this instead", value=current_sub, key=sub_key, placeholder="leave blank to keep original")
+                if new_sub != current_sub:
+                    st.session_state.substitutions[sub_key] = new_sub
+
         if any(a.lower() in ing.lower() for a in st.session_state.allergies):
-            st.error(f"⚠️ Contains {ing} (matches allergy)")
-            continue
-        display_ing = ing
-        if st.session_state.allow_subs and "Lower sodium" in st.session_state.goals and "soy sauce" in ing:
-            display_ing = "low-sodium soy sauce or coconut aminos"
-        st.write(f"- {smart_display(scaled, display_ing, unit)}")
+            st.error(f"⚠️ Allergy warning: {ing}")
 
     if st.session_state.show_nutrition:
         st.write("### Approximate Nutrition (per serving)")
         for k, v in recipe["nutrition_per_serving"].items():
-            st.write(f"{k.title()}: ~{v * scale:.0f}")
+            st.write(f"{k.title()}: ~{v:.0f}")
 
 with tab3:
     st.subheader("Shopping List (missing items)")
@@ -164,19 +171,29 @@ with tab3:
         for ing, base in recipe["ingredients"].items():
             if any(a.lower() in ing.lower() for a in st.session_state.allergies):
                 continue
+            # Check if user substituted this ingredient
+            sub_key = f"sub_{name}_{ing}"
+            used_item = st.session_state.substitutions.get(sub_key, ing)
+            if used_item.strip() == "":
+                used_item = ing
+
             have = 0
             if not st.session_state.inventory.empty:
-                matches = st.session_state.inventory[st.session_state.inventory["Item"].str.contains(ing.split()[0], case=False, na=False)]
+                matches = st.session_state.inventory[st.session_state.inventory["Item"].str.lower() == used_item.lower()]
                 if not matches.empty:
                     have = matches["Quantity"].sum()
             missing = max(0, base - have)
             if missing > 0.05:
-                needed[ing] = needed.get(ing, 0) + missing
+                needed[used_item] = needed.get(used_item, 0) + missing
 
     if needed:
         for item, qty in needed.items():
-            unit = SAMPLE_RECIPES["Simple Chicken Stir-Fry"]["units"].get(item, "count")
-            if "beef" in item or "chicken" in item:
+            unit = "count"
+            for r in SAMPLE_RECIPES.values():
+                if item in r["units"]:
+                    unit = r["units"][item]
+                    break
+            if "beef" in item.lower() or "chicken" in item.lower():
                 unit = "lbs"
             st.write(f"• {smart_display(qty, item, unit)}")
     else:
@@ -186,22 +203,18 @@ with tab4:
     st.subheader("Sample Recipes")
     for name, r in SAMPLE_RECIPES.items():
         with st.expander(name):
-            st.write(f"Main protein base: {r['base_qty']} lbs")
+            st.write(f"Main protein: {r['base_qty']} lbs {r['main']}")
             st.write("Ingredients:", ", ".join(r["ingredients"].keys()))
 
 with tab5:
     st.subheader("Helper")
-    st.write("Simple suggestions based on what you have:")
+    st.write("Simple suggestions:")
     if st.session_state.inventory.empty:
-        st.info("Add some inventory items first and I’ll give you tips.")
+        st.info("Add inventory items to get tips.")
     else:
-        items = st.session_state.inventory["Item"].str.lower().tolist()
-        if any("chicken" in i for i in items):
-            st.write("• You have chicken — the stir-fry recipe can use it up.")
-        if any("onion" in i for i in items):
-            st.write("• Onion is useful in almost every recipe. Keep it.")
-        if any("beef" in i for i in items):
-            st.write("• Ground beef works well in the skillet recipe.")
-        st.write("• Tip: Add more items to inventory and the shopping list will shrink.")
+        st.write("• On the Meal Plan tab you can type a substitute for any ingredient.")
+        st.write("• The shopping list will use your substitutes when calculating what’s missing.")
+        if any("chicken" in i.lower() for i in st.session_state.inventory["Item"]):
+            st.write("• You have chicken — you can use it in the stir-fry.")
 
-st.caption("Updated version — simpler measurements + basic helper.")
+st.caption("Exact recipe ingredients + manual substitutions + gallons unit.")
