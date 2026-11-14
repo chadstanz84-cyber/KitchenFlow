@@ -9,15 +9,17 @@ st.set_page_config(page_title="KitchenFlow", page_icon="🍳", layout="wide")
 TRANSLATIONS = {
     "English": {
         "title": "🍳 KitchenFlow — Meal Prep & Inventory Assistant",
+        "choose_lang": "Choose your language",
+        "continue": "Continue",
         "language": "Language",
         "measurements": "Measurement system",
-        "us": "US (lbs, cups, ounces)",
-        "metric": "Metric (kg, liters, grams)",
+        "us": "US (pounds, cups, ounces)",
+        "metric": "Metric (kilograms, liters, grams)",
         "preferences": "Preferences",
         "show_nutrition": "Show nutrition details",
         "allow_subs": "Allow easy substitutions",
         "allergies": "Allergies / Restrictions",
-        "add_allergy": "Add allergy or restriction",
+        "add_allergy": "Add an allergy or restriction",
         "add": "Add",
         "inventory": "Inventory",
         "meal_plan": "Meal Plan",
@@ -28,29 +30,120 @@ TRANSLATIONS = {
         "item": "Item",
         "quantity": "Quantity",
         "unit": "Unit",
-        "location": "Location",
-        "expiration": "Expiration",
+        "location": "Storage location",
+        "expiration": "Expiration date",
         "add_item": "Add Item",
         "fresh_frozen": "Fresh or Frozen",
         "fresh": "Fresh",
         "frozen": "Frozen",
-        "delete": "Delete",
-        "choose_recipe": "Search recipes",
+        "delete": "Remove",
+        "search_recipes": "Search for a recipe or main ingredient",
         "ingredients": "Ingredients",
         "instructions": "Instructions",
-        "use_instead": "Use this instead",
-        "recommended": "Recommended",
-        "acceptable": "Acceptable replacement you have",
-        "missing_items": "Shopping List (missing items)",
-        "helper_title": "Helper",
-        "select_specific": "Select a specific item",
-        "no_items": "No items in this location yet.",
-        "current_place": "Current Place",
-        "add_place": "Add new place (home, store, etc.)",
-        "places": "Places",
-        "search_recipes": "Type a recipe or ingredient to search the web",
+        "edit_recipe": "Edit this recipe to make it your own",
+        "save_changes": "Save my changes",
         "nutrition_goals": "Nutrition Goals",
-        "goal_note": "Goals help highlight suitable recipes"
+        "goal_note": "Your goals help highlight better-fitting recipes",
+        "current_place": "Current location",
+        "add_place": "Add a new location (home, store, etc.)",
+        "places": "Locations",
+        "no_items": "No items in this location yet.",
+        "select_specific": "Choose a specific item",
+        "no_results": "No recipes found. Try a different search (for example: chicken, pasta, soup).",
+        "fetch_error": "Unable to load recipes right now. Please try again in a moment.",
+        "active_goals": "Your active goals"
+    },
+    "Español": {
+        "title": "🍳 KitchenFlow — Asistente de comidas e inventario",
+        "choose_lang": "Elige tu idioma",
+        "continue": "Continuar",
+        "language": "Idioma",
+        "measurements": "Sistema de medidas",
+        "us": "EE.UU. (libras, tazas, onzas)",
+        "metric": "Métrico (kg, litros, gramos)",
+        "preferences": "Preferencias",
+        "show_nutrition": "Mostrar detalles nutricionales",
+        "allow_subs": "Permitir sustituciones fáciles",
+        "allergies": "Alergias / Restricciones",
+        "add_allergy": "Agregar una alergia o restricción",
+        "add": "Agregar",
+        "inventory": "Inventario",
+        "meal_plan": "Plan de comidas",
+        "shopping_list": "Lista de compras",
+        "recipes": "Recetas",
+        "helper": "Ayuda",
+        "your_inventory": "Tu inventario",
+        "item": "Artículo",
+        "quantity": "Cantidad",
+        "unit": "Unidad",
+        "location": "Lugar de almacenamiento",
+        "expiration": "Fecha de caducidad",
+        "add_item": "Agregar artículo",
+        "fresh_frozen": "Fresco o congelado",
+        "fresh": "Fresco",
+        "frozen": "Congelado",
+        "delete": "Eliminar",
+        "search_recipes": "Busca una receta o ingrediente principal",
+        "ingredients": "Ingredientes",
+        "instructions": "Instrucciones",
+        "edit_recipe": "Edita esta receta para hacerla tuya",
+        "save_changes": "Guardar mis cambios",
+        "nutrition_goals": "Metas nutricionales",
+        "goal_note": "Tus metas ayudan a destacar recetas más adecuadas",
+        "current_place": "Ubicación actual",
+        "add_place": "Agregar una nueva ubicación (casa, tienda, etc.)",
+        "places": "Ubicaciones",
+        "no_items": "No hay artículos en esta ubicación todavía.",
+        "select_specific": "Elige un artículo específico",
+        "no_results": "No se encontraron recetas. Prueba con otra búsqueda (por ejemplo: pollo, pasta, sopa).",
+        "fetch_error": "No se pudieron cargar las recetas en este momento. Inténtalo de nuevo en un momento.",
+        "active_goals": "Tus metas activas"
+    },
+    "Français": {
+        "title": "🍳 KitchenFlow — Assistant repas et inventaire",
+        "choose_lang": "Choisissez votre langue",
+        "continue": "Continuer",
+        "language": "Langue",
+        "measurements": "Système de mesure",
+        "us": "US (livres, tasses, onces)",
+        "metric": "Métrique (kg, litres, grammes)",
+        "preferences": "Préférences",
+        "show_nutrition": "Afficher les détails nutritionnels",
+        "allow_subs": "Autoriser les substitutions faciles",
+        "allergies": "Allergies / Restrictions",
+        "add_allergy": "Ajouter une allergie ou une restriction",
+        "add": "Ajouter",
+        "inventory": "Inventaire",
+        "meal_plan": "Plan de repas",
+        "shopping_list": "Liste de courses",
+        "recipes": "Recettes",
+        "helper": "Aide",
+        "your_inventory": "Votre inventaire",
+        "item": "Article",
+        "quantity": "Quantité",
+        "unit": "Unité",
+        "location": "Lieu de stockage",
+        "expiration": "Date d’expiration",
+        "add_item": "Ajouter un article",
+        "fresh_frozen": "Frais ou surgelé",
+        "fresh": "Frais",
+        "frozen": "Surgelé",
+        "delete": "Supprimer",
+        "search_recipes": "Rechercher une recette ou un ingrédient principal",
+        "ingredients": "Ingrédients",
+        "instructions": "Instructions",
+        "edit_recipe": "Modifiez cette recette pour la personnaliser",
+        "save_changes": "Enregistrer mes modifications",
+        "nutrition_goals": "Objectifs nutritionnels",
+        "goal_note": "Vos objectifs aident à mettre en avant les recettes adaptées",
+        "current_place": "Emplacement actuel",
+        "add_place": "Ajouter un nouvel emplacement (maison, magasin, etc.)",
+        "places": "Emplacements",
+        "no_items": "Aucun article dans cet emplacement pour le moment.",
+        "select_specific": "Choisir un article spécifique",
+        "no_results": "Aucune recette trouvée. Essayez une autre recherche (par exemple : poulet, pâtes, soupe).",
+        "fetch_error": "Impossible de charger les recettes pour le moment. Veuillez réessayer dans un instant.",
+        "active_goals": "Vos objectifs actifs"
     }
 }
 
@@ -90,7 +183,6 @@ def guess_unit(item_name):
     return "count"
 
 def search_web_recipes(query):
-    """Pull recipes from TheMealDB free API"""
     if not query or len(query) < 2:
         return []
     try:
@@ -101,7 +193,7 @@ def search_web_recipes(query):
         if not meals:
             return []
         results = []
-        for meal in meals[:8]:  # Limit to 8 results
+        for meal in meals[:8]:
             ingredients = []
             for i in range(1, 21):
                 ing = meal.get(f"strIngredient{i}")
@@ -117,9 +209,8 @@ def search_web_recipes(query):
                 "image": meal.get("strMealThumb", "")
             })
         return results
-    except Exception as e:
-        st.error(f"Could not fetch recipes: {e}")
-        return []
+    except Exception:
+        return None  # Signal error
 
 # ---------- Session State ----------
 if "language" not in st.session_state:
@@ -138,11 +229,14 @@ if "show_nutrition" not in st.session_state:
     st.session_state.show_nutrition = False
 if "goals" not in st.session_state:
     st.session_state.goals = []
+if "edited_recipes" not in st.session_state:
+    st.session_state.edited_recipes = {}
 
 if st.session_state.language is None:
     st.title("KitchenFlow")
-    lang = st.selectbox("Choose your language", list(TRANSLATIONS.keys()))
-    if st.button("Continue"):
+    st.write("### Choose your language / Elige tu idioma / Choisissez votre langue")
+    lang = st.selectbox("Language", list(TRANSLATIONS.keys()))
+    if st.button("Continue / Continuar / Continuer"):
         st.session_state.language = lang
         st.rerun()
     st.stop()
@@ -155,6 +249,12 @@ unit_options = ["lbs", "cups", "count", "oz", "cloves", "gallons"] if st.session
 # ---------- Sidebar ----------
 with st.sidebar:
     st.header(t["preferences"])
+    # Easy language change
+    new_lang = st.selectbox(t["language"], list(TRANSLATIONS.keys()), index=list(TRANSLATIONS.keys()).index(st.session_state.language))
+    if new_lang != st.session_state.language:
+        st.session_state.language = new_lang
+        st.rerun()
+
     st.subheader(t["places"])
     place_list = list(st.session_state.places.keys())
     selected = st.selectbox(t["current_place"], place_list, index=place_list.index(st.session_state.current_place))
@@ -163,13 +263,17 @@ with st.sidebar:
         st.rerun()
 
     new_place = st.text_input(t["add_place"])
-    if st.button("Add Place") and new_place and new_place not in st.session_state.places:
+    if st.button("Add location") and new_place and new_place not in st.session_state.places:
         st.session_state.places[new_place] = pd.DataFrame(columns=["Item", "Quantity", "Unit", "Fresh/Frozen", "Location", "Expiration"])
         st.session_state.current_place = new_place
         st.rerun()
 
     st.subheader(t["nutrition_goals"])
-    goal_options = ["Gain weight", "Lose weight", "Higher protein", "Add potassium", "Cut sodium", "Cut sugars", "Higher fiber", "Lower saturated fat"]
+    goal_options = [
+        "Gain weight", "Lose weight", "Higher protein",
+        "Increase potassium", "Reduce sodium", "Reduce sugars",
+        "Higher fiber", "Reduce saturated fat"
+    ]
     st.session_state.goals = st.multiselect("Select your goals", goal_options, default=st.session_state.goals)
     if st.session_state.goals:
         st.caption(t["goal_note"])
@@ -177,7 +281,7 @@ with st.sidebar:
     st.session_state.show_nutrition = st.toggle(t["show_nutrition"], value=st.session_state.show_nutrition)
     st.session_state.allow_subs = st.toggle(t["allow_subs"], value=st.session_state.allow_subs)
     meas = st.radio(t["measurements"], [t["us"], t["metric"]])
-    st.session_state.measurement = "US" if "US" in meas else "Metric"
+    st.session_state.measurement = "US" if "US" in meas or "EE.UU" in meas else "Metric"
 
     st.subheader(t["allergies"])
     new_allergy = st.text_input(t["add_allergy"])
@@ -230,7 +334,7 @@ with tab1:
             st.rerun()
 
     st.write("---")
-    st.write("### Current Items")
+    st.write("### Current items")
     inv = st.session_state.places[st.session_state.current_place]
     if inv.empty:
         st.info(t["no_items"])
@@ -254,41 +358,54 @@ with tab1:
 with tab2:
     st.subheader(t["meal_plan"])
     if st.session_state.goals:
-        st.info(f"Active goals: {', '.join(st.session_state.goals)}")
+        st.info(f"{t['active_goals']}: {', '.join(st.session_state.goals)}")
 
     search = st.text_input(t["search_recipes"], placeholder="e.g. chicken, pasta, salmon, soup...")
     if search:
         with st.spinner("Searching recipes..."):
             web_recipes = search_web_recipes(search)
-        if web_recipes:
+        if web_recipes is None:
+            st.error(t["fetch_error"])
+        elif web_recipes:
             recipe_names = [r["name"] for r in web_recipes]
             selected_name = st.selectbox("Select a recipe", recipe_names)
             selected = next(r for r in web_recipes if r["name"] == selected_name)
+            recipe_key = selected["name"]
+
             st.write(f"**{selected['name']}**  ({selected['category']} — {selected['area']})")
             if selected["image"]:
                 st.image(selected["image"], width=300)
-            st.write(f"### {t['ingredients']}")
-            for ing in selected["ingredients"]:
-                st.write(f"• {ing}")
-            st.write(f"### {t['instructions']}")
-            st.write(selected["instructions"])
+
+            # Editable version
+            default_ings = "\n".join(selected["ingredients"])
+            default_instr = selected["instructions"]
+            edited_ings = st.text_area(t["ingredients"], value=st.session_state.edited_recipes.get(recipe_key, {}).get("ings", default_ings), height=180)
+            edited_instr = st.text_area(t["instructions"], value=st.session_state.edited_recipes.get(recipe_key, {}).get("instr", default_instr), height=220)
+
+            if st.button(t["save_changes"]):
+                st.session_state.edited_recipes[recipe_key] = {"ings": edited_ings, "instr": edited_instr}
+                st.success("Your changes have been saved for this session.")
+
+            st.caption(t["edit_recipe"])
+            if any(g in st.session_state.goals for g in ["Reduce sodium", "Reduce sugars"]):
+                st.info("Tip: You can remove or reduce high-sodium or high-sugar ingredients above to better match your goals.")
         else:
-            st.info("No recipes found. Try a different search term (e.g. 'chicken', 'beef', 'pasta').")
+            st.info(t["no_results"])
     else:
-        st.info("Type a recipe or main ingredient above to search the web.")
+        st.info("Type a recipe name or main ingredient above to search.")
 
 with tab3:
-    st.subheader(t["missing_items"])
+    st.subheader(t["shopping_list"])
     st.info(f"Shopping list for **{st.session_state.current_place}** only.")
 
 with tab4:
     st.subheader(t["recipes"])
-    st.info("Use the Meal Plan tab to search and view recipes from the web.")
+    st.info("Use the Meal Plan tab to search for recipes from the web and edit them.")
 
 with tab5:
-    st.subheader(t["helper_title"])
-    st.write(f"Current place: **{st.session_state.current_place}**")
-    st.write("Search recipes in the Meal Plan tab — they are pulled live from the web (TheMealDB).")
-    st.write("Set nutrition goals in the sidebar.")
+    st.subheader(t["helper"])
+    st.write(f"Current location: **{st.session_state.current_place}**")
+    st.write("Change language anytime in the sidebar.")
+    st.write("Edit any web recipe in the Meal Plan tab to personalize it or better match your goals.")
 
-st.caption("Live web recipe search added (TheMealDB).")
+st.caption("Editable web recipes, improved wording, and easy language switching.")
