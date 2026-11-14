@@ -7,7 +7,7 @@ st.set_page_config(page_title="KitchenFlow", page_icon="🍳", layout="wide")
 
 TRANSLATIONS = {
     "English": {
-        "title": "🍳 KitchenFlow — Meal Prep & Grocery Assistant",
+        "title": "🍳 KitchenFlow — Meal Prep & Inventory Assistant",
         "language": "Language",
         "measurements": "Measurement system",
         "us": "US (lbs, cups, ounces)",
@@ -34,6 +34,7 @@ TRANSLATIONS = {
         "fresh": "Fresh",
         "frozen": "Frozen",
         "delete": "Delete",
+        "update": "Update Qty",
         "choose_recipe": "Choose a base recipe",
         "ingredients": "Ingredients",
         "instructions": "Instructions",
@@ -43,7 +44,10 @@ TRANSLATIONS = {
         "missing_items": "Shopping List (missing items)",
         "helper_title": "Helper",
         "select_specific": "Select a specific item",
-        "no_items": "No items in inventory yet."
+        "no_items": "No items in this location yet.",
+        "current_place": "Current Place",
+        "add_place": "Add new place (home, store, etc.)",
+        "places": "Places"
     }
 }
 
@@ -58,7 +62,7 @@ ITEM_SUGGESTIONS = {
 KNOWN_ITEMS = [
     "chicken breast", "chicken thighs", "chicken wings", "chicken drumsticks", "whole chicken", "ground chicken",
     "ground beef", "beef", "milk", "whole milk", "broccoli", "onion", "yellow onion", "garlic", "rice",
-    "soy sauce", "bell peppers", "tomato sauce", "eggs", "butter", "cheese"
+    "soy sauce", "bell peppers", "tomato sauce", "eggs", "butter", "cheese", "bread", "soda", "chips"
 ]
 
 def correct_spelling(word):
@@ -71,22 +75,25 @@ def correct_spelling(word):
 
 def guess_unit(item_name):
     name = item_name.lower()
-    if any(x in name for x in ["milk", "water", "juice", "oil"]):
+    if any(x in name for x in ["milk", "water", "juice", "oil", "soda"]):
         return "gallons" if st.session_state.get("measurement", "US") == "US" else "liters"
     if any(x in name for x in ["chicken", "beef", "pork", "meat", "fish"]):
         return "lbs" if st.session_state.get("measurement", "US") == "US" else "kg"
     if "garlic" in name:
         return "cloves"
-    if any(x in name for x in ["onion", "pepper", "egg", "apple", "banana", "potato"]):
+    if any(x in name for x in ["onion", "pepper", "egg", "apple", "banana", "potato", "bread"]):
         return "count"
     return "count"
 
+# ---------- Session State ----------
 if "language" not in st.session_state:
     st.session_state.language = None
 if "measurement" not in st.session_state:
     st.session_state.measurement = "US"
-if "inventory" not in st.session_state:
-    st.session_state.inventory = pd.DataFrame(columns=["Item", "Quantity", "Unit", "Fresh/Frozen", "Location", "Expiration"])
+if "places" not in st.session_state:
+    st.session_state.places = {"Home": pd.DataFrame(columns=["Item", "Quantity", "Unit", "Fresh/Frozen", "Location", "Expiration"])}
+if "current_place" not in st.session_state:
+    st.session_state.current_place = "Home"
 if "allergies" not in st.session_state:
     st.session_state.allergies = []
 if "allow_subs" not in st.session_state:
@@ -128,17 +135,41 @@ SAMPLE_RECIPES = {
     }
 }
 
+# ---------- Sidebar ----------
 with st.sidebar:
     st.header(t["preferences"])
+    st.subheader(t["places"])
+    place_list = list(st.session_state.places.keys())
+    selected = st.selectbox(t["current_place"], place_list, index=place_list.index(st.session_state.current_place))
+    if selected != st.session_state.current_place:
+        st.session_state.current_place = selected
+        st.rerun()
+
+    new_place = st.text_input(t["add_place"])
+    if st.button("Add Place") and new_place and new_place not in st.session_state.places:
+        st.session_state.places[new_place] = pd.DataFrame(columns=["Item", "Quantity", "Unit", "Fresh/Frozen", "Location", "Expiration"])
+        st.session_state.current_place = new_place
+        st.rerun()
+
     st.session_state.show_nutrition = st.toggle(t["show_nutrition"], value=st.session_state.show_nutrition)
     st.session_state.allow_subs = st.toggle(t["allow_subs"], value=st.session_state.allow_subs)
     meas = st.radio(t["measurements"], [t["us"], t["metric"]])
     st.session_state.measurement = "US" if "US" in meas else "Metric"
 
+    st.subheader(t["allergies"])
+    new_allergy = st.text_input(t["add_allergy"])
+    if st.button(t["add"]) and new_allergy:
+        if new_allergy.lower() not in [a.lower() for a in st.session_state.allergies]:
+            st.session_state.allergies.append(new_allergy)
+            st.rerun()
+
+# Current inventory for selected place
+current_inv = st.session_state.places[st.session_state.current_place]
+
 tab1, tab2, tab3, tab4, tab5 = st.tabs([t["inventory"], t["meal_plan"], t["shopping_list"], t["recipes"], t["helper"]])
 
 with tab1:
-    st.subheader(t["your_inventory"])
+    st.subheader(f"{t['your_inventory']} — {st.session_state.current_place}")
     raw_item = st.text_input(t["item"], key="raw_item")
     corrected = correct_spelling(raw_item) if raw_item else ""
 
@@ -161,7 +192,7 @@ with tab1:
         qty = c2.number_input(t["quantity"], min_value=0.0, step=0.1, value=1.0)
         unit = c3.selectbox(t["unit"], unit_options, index=default_idx)
         fresh_frozen = c4.selectbox(t["fresh_frozen"], [t["fresh"], t["frozen"]])
-        loc = c5.selectbox(t["location"], ["Fridge", "Freezer", "Pantry"])
+        loc = c5.selectbox(t["location"], ["Fridge", "Freezer", "Pantry", "Shelf", "Backroom"])
         exp = c6.date_input(t["expiration"], value=datetime.now() + timedelta(days=7))
         if st.form_submit_button(t["add_item"]) and item:
             final_item = correct_spelling(item)
@@ -173,50 +204,56 @@ with tab1:
                 "Location": loc,
                 "Expiration": exp
             }])
-            st.session_state.inventory = pd.concat([st.session_state.inventory, new_row], ignore_index=True)
+            st.session_state.places[st.session_state.current_place] = pd.concat(
+                [current_inv, new_row], ignore_index=True
+            )
             st.rerun()
 
     st.write("---")
     st.write("### Current Items")
-    if st.session_state.inventory.empty:
+    inv = st.session_state.places[st.session_state.current_place]
+    if inv.empty:
         st.info(t["no_items"])
     else:
-        for idx, row in st.session_state.inventory.iterrows():
-            col1, col2, col3 = st.columns([4, 2, 1])
+        for idx, row in inv.iterrows():
+            col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
             with col1:
-                st.write(f"**{row['Item']}** — {row['Quantity']} {row['Unit']} ({row['Fresh/Frozen']})")
+                st.write(f"**{row['Item']}**")
             with col2:
-                st.write(f"{row['Location']} | Exp: {row['Expiration']}")
+                new_qty = st.number_input("Qty", value=float(row["Quantity"]), key=f"qty_{idx}", step=0.1, label_visibility="collapsed")
             with col3:
+                st.write(f"{row['Unit']} | {row['Fresh/Frozen']}")
+            with col4:
                 if st.button(t["delete"], key=f"del_{idx}"):
-                    st.session_state.inventory = st.session_state.inventory.drop(idx).reset_index(drop=True)
+                    st.session_state.places[st.session_state.current_place] = inv.drop(idx).reset_index(drop=True)
                     st.rerun()
+            # Update quantity if changed
+            if new_qty != row["Quantity"]:
+                st.session_state.places[st.session_state.current_place].at[idx, "Quantity"] = new_qty
+                st.rerun()
 
 with tab2:
     st.subheader(t["meal_plan"])
     recipe_name = st.selectbox(t["choose_recipe"], list(SAMPLE_RECIPES.keys()))
     recipe = SAMPLE_RECIPES[recipe_name]
-
     st.write(f"### {t['ingredients']}")
-    inventory_items = [i.lower() for i in st.session_state.inventory["Item"].tolist()] if not st.session_state.inventory.empty else []
-
+    inventory_items = [i.lower() for i in inv["Item"].tolist()] if not inv.empty else []
     for ing, details in recipe["ingredients"].items():
         st.write(f"**{t['recommended']}:** {ing}")
-        found = next((acc for acc in details.get("acceptable", []) if any(acc in inv for inv in inventory_items)), None)
+        found = next((acc for acc in details.get("acceptable", []) if any(acc in i for i in inventory_items)), None)
         if found:
             st.success(f"**{t['acceptable']}:** {found}")
         else:
             st.write(f"• {details['qty']} {details['unit']} {ing}")
         if st.session_state.allow_subs:
             st.text_input(t["use_instead"], key=f"sub_{ing}", placeholder="optional")
-
     st.write(f"### {t['instructions']}")
     for i, step in enumerate(recipe.get("instructions", []), 1):
         st.write(f"{i}. {step}")
 
 with tab3:
     st.subheader(t["missing_items"])
-    st.info("Shopping list respects your specific items.")
+    st.info(f"Shopping list for {st.session_state.current_place} (can be expanded).")
 
 with tab4:
     st.subheader(t["recipes"])
@@ -228,6 +265,8 @@ with tab4:
 
 with tab5:
     st.subheader(t["helper_title"])
-    st.write("Use the Delete button next to any item to remove it from your inventory.")
+    st.write(f"Managing inventory for: **{st.session_state.current_place}**")
+    st.write("Add more places in the sidebar (Home, Store, Cabin, etc.).")
+    st.write("Change quantities directly in the list. Delete with the button.")
 
-st.caption("Simple delete buttons added for inventory items.")
+st.caption("Multiple places (homes & stores) + easy quantity editing added.")
