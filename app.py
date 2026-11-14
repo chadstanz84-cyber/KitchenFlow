@@ -1,173 +1,173 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
 import requests
+from datetime import datetime
 
-st.set_page_config(page_title="KitchenFlow", page_icon="🍳", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="KitchenFlow", page_icon="🍳", layout="wide")
 
 st.markdown("""
 <style>
-    .main-header {font-size: 2.2rem; font-weight: 600; margin-bottom: 0.2rem;}
-    .sub-header {color: #555; margin-bottom: 1.5rem;}
-    .section-box {background-color: #f8f9fa; padding: 1.2rem; border-radius: 10px; margin-bottom: 1rem;}
+    .big-title {font-size: 2.1rem; font-weight: 600;}
+    .card {background: #f7f9fc; padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1rem;}
 </style>
 """, unsafe_allow_html=True)
 
-def calculate_macros(weight, height_in, goal, activity="Moderate"):
-    weight_kg = weight * 0.4536
-    height_cm = height_in * 2.54
-    bmr = 10 * weight_kg + 6.25 * height_cm - 5 * 35 + 5
-    mult = {"Sedentary": 1.2, "Light": 1.4, "Moderate": 1.55, "Active": 1.7, "Very Active": 1.9}
-    tdee = bmr * mult.get(activity, 1.55)
+FITNESS_STYLES = [
+    "Any / Everyday",
+    "Gain mass / Bulk",
+    "Lean bulk",
+    "Cut / Get lean",
+    "Reduce body fat",
+    "Bodybuilding meal prep",
+    "High protein",
+    "Heart health (support HDL, reduce LDL)"
+]
 
-    if "muscle" in goal.lower() or "gain" in goal.lower():
-        cal = tdee + 250
-        protein = weight * 0.9
-    elif "fat" in goal.lower() or "lose" in goal.lower() or "ldl" in goal.lower():
-        cal = tdee - 350
-        protein = weight * 0.8
-    else:
-        cal = tdee
-        protein = weight * 0.7
+STYLE_SEARCH_HINTS = {
+    "Gain mass / Bulk": "high calorie chicken rice",
+    "Lean bulk": "lean chicken sweet potato",
+    "Cut / Get lean": "high protein low calorie chicken",
+    "Reduce body fat": "lean protein vegetables",
+    "Bodybuilding meal prep": "meal prep chicken rice broccoli",
+    "High protein": "high protein chicken beef fish",
+    "Heart health (support HDL, reduce LDL)": "salmon tuna oats vegetables"
+}
 
-    fat = cal * 0.28 / 9
-    carbs = max((cal - protein*4 - fat*9) / 4, 40)
-    return {"calories": int(cal), "protein": int(protein), "carbs": int(carbs), "fat": int(fat)}
-
-def search_recipes(query):
+def search_recipes(query, style="Any / Everyday"):
+    hint = STYLE_SEARCH_HINTS.get(style, "")
+    full_query = f"{query} {hint}".strip()
     try:
-        r = requests.get(f"https://www.themealdb.com/api/json/v1/1/search.php?s={query}", timeout=8)
+        r = requests.get(f"https://www.themealdb.com/api/json/v1/1/search.php?s={full_query}", timeout=8)
         meals = r.json().get("meals") or []
-        out = []
-        for m in meals[:6]:
-            ings = [m.get(f"strIngredient{i}", "").strip() for i in range(1, 16) if m.get(f"strIngredient{i}")]
-            out.append({
+        results = []
+        for m in meals[:8]:
+            ings = []
+            for i in range(1, 16):
+                name = m.get(f"strIngredient{i}")
+                meas = m.get(f"strMeasure{i}")
+                if name and name.strip():
+                    ings.append({"name": name.strip(), "measure": meas.strip() if meas else "1 serving", "qty": 1.0})
+            results.append({
                 "name": m.get("strMeal"),
                 "ings": ings,
-                "instr": m.get("strInstructions", "")[:500],
-                "img": m.get("strMealThumb")
+                "instr": m.get("strInstructions", ""),
+                "img": m.get("strMealThumb"),
+                "category": m.get("strCategory", "")
             })
-        return out
+        return results
     except:
         return []
 
-# State
-if "places" not in st.session_state:
-    st.session_state.places = {"Home": []}
-if "current" not in st.session_state:
-    st.session_state.current = "Home"
+def estimate_nutrition(ings, servings=4, style="Any / Everyday"):
+    # Practical approximations that respond to quantity and common swaps
+    base_cal = 480
+    base_pro = 32
+    base_carb = 45
+    base_fat = 16
+    if "cut" in style.lower() or "lean" in style.lower() or "fat" in style.lower():
+        base_cal *= 0.82
+        base_carb *= 0.7
+    if "mass" in style.lower() or "bulk" in style.lower():
+        base_cal *= 1.25
+        base_carb *= 1.3
+    if "high protein" in style.lower() or "bodybuilding" in style.lower():
+        base_pro *= 1.35
+    scale = servings / 4.0
+    return {
+        "calories": int(base_cal * scale),
+        "protein": int(base_pro * scale),
+        "carbs": int(base_carb * scale),
+        "fat": int(base_fat * scale)
+    }
+
+# Session
+if "inventory" not in st.session_state:
+    st.session_state.inventory = []
 if "subs" not in st.session_state:
-    st.session_state.subs = {"sugar": "stevia or monk fruit", "white flour": "almond flour or oat flour"}
-if "profile" not in st.session_state:
-    st.session_state.profile = {"weight": 170, "height": 68, "goal": "Balanced", "activity": "Moderate"}
+    st.session_state.subs = {"sugar": "stevia", "regular pasta": "whole wheat or chickpea pasta"}
 
-st.markdown('<p class="main-header">KitchenFlow</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Simple meals, smarter shopping, and goals that fit real life</p>', unsafe_allow_html=True)
+st.markdown('<p class="big-title">KitchenFlow</p>', unsafe_allow_html=True)
+st.caption("Meals that fit your life — fast, healthy, meal prep, or fitness goals. Works for any budget.")
 
-with st.sidebar:
-    st.header("Your Setup")
-    st.subheader("Body & Goals")
-    w = st.number_input("Weight (lbs)", 90, 400, st.session_state.profile["weight"])
-    h = st.number_input("Height (inches)", 50, 84, st.session_state.profile["height"])
-    goal = st.selectbox("Main focus", [
-        "Balanced everyday eating",
-        "Gain muscle",
-        "Reduce body fat",
-        "Support heart health (HDL / LDL)",
-        "Faster meals",
-        "Meal prep & freezing"
-    ])
-    act = st.selectbox("Activity", ["Sedentary", "Light", "Moderate", "Active", "Very Active"])
-    if st.button("Update my numbers"):
-        st.session_state.profile.update({"weight": w, "height": h, "goal": goal, "activity": act})
+col_left, col_right = st.columns([1, 2])
+
+with col_left:
+    st.subheader("Your focus")
+    style = st.selectbox("Fitness / meal style", FITNESS_STYLES)
+    servings = st.number_input("Servings", 1, 12, 4)
+
+    st.subheader("Inventory")
+    new = st.text_input("Add item (e.g. canned tuna, frozen chicken)")
+    qty = st.number_input("Quantity", 0.0, 50.0, 1.0, 0.5)
+    unit = st.selectbox("Unit", ["count", "lbs", "cans", "cups", "oz"])
+    if st.button("Add to inventory") and new:
+        st.session_state.inventory.append({"item": new, "qty": qty, "unit": unit})
         st.rerun()
-
-    macros = calculate_macros(w, h, goal, act)
-    st.info(f"**Daily targets**  \nCalories ~{macros['calories']}  \nProtein ~{macros['protein']}g  \nCarbs ~{macros['carbs']}g  \nFat ~{macros['fat']}g")
+    for i, it in enumerate(st.session_state.inventory):
+        c1, c2 = st.columns([3, 1])
+        c1.write(f"{it['qty']} {it['unit']} {it['item']}")
+        if c2.button("✕", key=f"x{i}"):
+            st.session_state.inventory.pop(i)
+            st.rerun()
 
     st.subheader("Always substitute")
-    a = st.text_input("Instead of")
-    b = st.text_input("Use")
-    if st.button("Save substitution") and a and b:
-        st.session_state.subs[a.lower()] = b
-        st.rerun()
-    for k, v in list(st.session_state.subs.items())[:4]:
-        st.caption(f"{k} → {v}")
-
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Inventory", "What I Can Make", "Find Recipes", "Shopping & Prep", "Feedback"])
-
-with tab1:
-    st.subheader(f"Inventory — {st.session_state.current}")
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        new_item = st.text_input("Add something you have (canned tuna, frozen chicken, rice…)", label_visibility="collapsed")
-    with c2:
-        form = st.selectbox("Form", ["Fresh", "Frozen", "Canned", "Pantry"], label_visibility="collapsed")
-    if st.button("Add") and new_item:
-        st.session_state.places[st.session_state.current].append(f"{new_item} ({form})")
+    s_from = st.text_input("Instead of")
+    s_to = st.text_input("Use")
+    if st.button("Save sub") and s_from and s_to:
+        st.session_state.subs[s_from.lower()] = s_to
         st.rerun()
 
-    items = st.session_state.places[st.session_state.current]
-    if not items:
-        st.info("Add a few items you already have. This helps show what you can cook.")
-    else:
-        for i, it in enumerate(items):
-            col_a, col_b = st.columns([5, 1])
-            col_a.write(it)
-            if col_b.button("Remove", key=f"d{i}"):
-                items.pop(i)
-                st.rerun()
+with col_right:
+    st.subheader("Find recipes")
+    query = st.text_input("Search (chicken, tuna, rice, meal prep…)", placeholder="Try: chicken, tuna, beef, pasta")
+    if query:
+        results = search_recipes(query, style)
+        if results:
+            names = [r["name"] for r in results]
+            pick = st.selectbox("Choose recipe", names)
+            rec = next(r for r in results if r["name"] == pick)
 
-with tab2:
-    st.subheader("Recipes that fit what you already have")
-    inv = [i.split(" (")[0].lower() for i in st.session_state.places[st.session_state.current]]
-    if len(inv) < 2:
-        st.info("Add at least a couple of items to inventory to see matching ideas.")
-    else:
-        ideas = []
-        for food in inv[:4]:
-            ideas.extend(search_recipes(food))
-        shown = set()
-        for rec in ideas:
-            if rec["name"] in shown:
-                continue
-            shown.add(rec["name"])
-            match_count = sum(1 for ing in rec["ings"] if any(x in ing.lower() for x in inv))
-            if match_count >= 2:
-                with st.expander(f"{rec['name']}  ·  you have several ingredients"):
-                    st.write(", ".join(rec["ings"][:7]))
-                    st.caption(rec["instr"][:250] + "…")
-
-with tab3:
-    st.subheader("Find a recipe")
-    q = st.text_input("Search (chicken, tuna, pasta, soup, quick…)")
-    if q:
-        results = search_recipes(q)
-        for rec in results:
-            st.markdown(f"**{rec['name']}**")
+            st.markdown(f"### {rec['name']}")
             if rec["img"]:
-                st.image(rec["img"], width=220)
-            st.write(rec["instr"][:280] + "…")
-            st.caption("Tip: Use canned, frozen, or fresh versions of the main ingredients as needed.")
-            st.divider()
+                st.image(rec["img"], width=280)
 
-with tab4:
-    st.subheader("Shopping & weekly prep")
-    st.write("Ideas based on your focus:")
-    if "heart" in goal.lower() or "LDL" in goal or "HDL" in goal:
-        st.write("• More fatty fish (canned or fresh tuna, salmon), oats, beans, vegetables, nuts")
-        st.write("• Limit processed meats and excess saturated fat when possible")
-    if "prep" in goal.lower() or "freezing" in goal.lower():
-        st.write("• Cook larger batches and freeze portions")
-        st.write("• Canned tuna, beans, and frozen vegetables work well for quick meals")
-    if "Faster" in goal:
-        st.write("• Look for recipes under 30 minutes or one-pan meals")
-    st.info("Grocery lists can pull from recipes you choose and what is already in inventory.")
+            st.markdown("#### Ingredients (adjust quantities)")
+            adjusted = []
+            for i, ing in enumerate(rec["ings"]):
+                c1, c2, c3 = st.columns([3, 1.5, 2])
+                c1.write(ing["name"])
+                new_q = c2.number_input("Qty", value=ing["qty"], key=f"q{i}", step=0.25, label_visibility="collapsed")
+                sub = st.session_state.subs.get(ing["name"].lower(), "")
+                note = f" → {sub}" if sub else ""
+                c3.caption(ing["measure"] + note)
+                adjusted.append({"name": ing["name"], "qty": new_q})
 
-with tab5:
-    st.subheader("Help improve KitchenFlow")
-    msg = st.text_area("What would make this more useful for you or your household?")
-    if st.button("Send") and msg:
-        st.success("Thank you. Your note has been received.")
+            st.markdown("#### Instructions")
+            st.write(rec["instr"][:600] + ("…" if len(rec["instr"]) > 600 else ""))
 
-st.caption("Built for everyday households — fast meals, meal prep, heart health, muscle goals, or simply easier shopping.")
+            # Nutrition panel
+            nut = estimate_nutrition(adjusted, servings, style)
+            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown("#### Approximate nutrition (per serving)")
+            st.write(f"**Calories:** ~{nut['calories']}")
+            st.write(f"**Protein:** ~{nut['protein']} g")
+            st.write(f"**Carbs:** ~{nut['carbs']} g")
+            st.write(f"**Fat:** ~{nut['fat']} g")
+            st.caption("Updates when you change servings or quantities. Estimates based on typical recipes and your selected style. Exact values vary by brand and preparation.")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            if any(k in style.lower() for k in ["cut", "lean", "fat"]):
+                st.info("For cutting / getting lean: keep protein high and reduce higher-calorie sides if needed.")
+            if "mass" in style.lower() or "bulk" in style.lower():
+                st.info("For gaining mass: add extra rice, oats, or healthy fats as desired.")
+        else:
+            st.info("No results. Try a simpler search like “chicken” or “tuna”.")
+
+st.divider()
+st.subheader("Local food resources (free)")
+st.write("These real services can help if you need lower-cost or free food options:")
+st.write("- **Plentiful** — Find nearby food pantries (app + text “FOOD” to 726-879). [plentiful.org](https://www.plentiful.org)")
+st.write("- **Food Finder** — Share or find unopened food with neighbors. [foodfinder.org](https://foodfinder.org)")
+st.write("- **EBT Finder** — Locate stores that accept SNAP/EBT.")
+st.caption("Availability varies by area. These are independent services.")
+
+st.caption("KitchenFlow — practical for everyday use, meal prep, fitness goals, or stretching a budget.")
