@@ -34,8 +34,7 @@ TRANSLATIONS = {
         "fresh": "Fresh",
         "frozen": "Frozen",
         "delete": "Delete",
-        "update": "Update Qty",
-        "choose_recipe": "Choose a base recipe",
+        "choose_recipe": "Search or choose a recipe",
         "ingredients": "Ingredients",
         "instructions": "Instructions",
         "use_instead": "Use this instead",
@@ -47,7 +46,8 @@ TRANSLATIONS = {
         "no_items": "No items in this location yet.",
         "current_place": "Current Place",
         "add_place": "Add new place (home, store, etc.)",
-        "places": "Places"
+        "places": "Places",
+        "search_recipes": "Type to search recipes"
     }
 }
 
@@ -132,6 +132,36 @@ SAMPLE_RECIPES = {
             "Pour in the soy sauce and stir everything together for 1 minute.",
             "Serve over the cooked rice."
         ]
+    },
+    "Beef & Vegetable Skillet": {
+        "ingredients": {
+            "ground beef": {"qty": 1.0, "unit": "lbs", "acceptable": ["ground turkey"]},
+            "bell peppers": {"qty": 2, "unit": "count", "acceptable": []},
+            "onion": {"qty": 1, "unit": "count", "acceptable": []},
+            "tomato sauce": {"qty": 1, "unit": "cup", "acceptable": []},
+            "rice": {"qty": 1, "unit": "cups", "acceptable": []}
+        },
+        "instructions": [
+            "Cook the rice according to package directions.",
+            "Brown the ground beef in a skillet and drain excess fat.",
+            "Add chopped onion and bell peppers. Cook until soft.",
+            "Stir in tomato sauce and simmer 5 minutes.",
+            "Serve over rice."
+        ]
+    },
+    "Garlic Butter Pasta": {
+        "ingredients": {
+            "pasta": {"qty": 1, "unit": "lbs", "acceptable": []},
+            "garlic": {"qty": 4, "unit": "cloves", "acceptable": []},
+            "butter": {"qty": 0.25, "unit": "cup", "acceptable": []},
+            "cheese": {"qty": 0.5, "unit": "cup", "acceptable": []}
+        },
+        "instructions": [
+            "Cook pasta according to package directions.",
+            "Melt butter in a pan and add minced garlic. Cook 1 minute.",
+            "Toss cooked pasta with the garlic butter.",
+            "Top with cheese and serve."
+        ]
     }
 }
 
@@ -156,14 +186,7 @@ with st.sidebar:
     meas = st.radio(t["measurements"], [t["us"], t["metric"]])
     st.session_state.measurement = "US" if "US" in meas else "Metric"
 
-    st.subheader(t["allergies"])
-    new_allergy = st.text_input(t["add_allergy"])
-    if st.button(t["add"]) and new_allergy:
-        if new_allergy.lower() not in [a.lower() for a in st.session_state.allergies]:
-            st.session_state.allergies.append(new_allergy)
-            st.rerun()
-
-# Current inventory for selected place
+# Current inventory (strictly separated by place)
 current_inv = st.session_state.places[st.session_state.current_place]
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs([t["inventory"], t["meal_plan"], t["shopping_list"], t["recipes"], t["helper"]])
@@ -204,9 +227,7 @@ with tab1:
                 "Location": loc,
                 "Expiration": exp
             }])
-            st.session_state.places[st.session_state.current_place] = pd.concat(
-                [current_inv, new_row], ignore_index=True
-            )
+            st.session_state.places[st.session_state.current_place] = pd.concat([current_inv, new_row], ignore_index=True)
             st.rerun()
 
     st.write("---")
@@ -227,33 +248,42 @@ with tab1:
                 if st.button(t["delete"], key=f"del_{idx}"):
                     st.session_state.places[st.session_state.current_place] = inv.drop(idx).reset_index(drop=True)
                     st.rerun()
-            # Update quantity if changed
             if new_qty != row["Quantity"]:
                 st.session_state.places[st.session_state.current_place].at[idx, "Quantity"] = new_qty
                 st.rerun()
 
 with tab2:
     st.subheader(t["meal_plan"])
-    recipe_name = st.selectbox(t["choose_recipe"], list(SAMPLE_RECIPES.keys()))
-    recipe = SAMPLE_RECIPES[recipe_name]
-    st.write(f"### {t['ingredients']}")
-    inventory_items = [i.lower() for i in inv["Item"].tolist()] if not inv.empty else []
-    for ing, details in recipe["ingredients"].items():
-        st.write(f"**{t['recommended']}:** {ing}")
-        found = next((acc for acc in details.get("acceptable", []) if any(acc in i for i in inventory_items)), None)
-        if found:
-            st.success(f"**{t['acceptable']}:** {found}")
-        else:
-            st.write(f"• {details['qty']} {details['unit']} {ing}")
-        if st.session_state.allow_subs:
-            st.text_input(t["use_instead"], key=f"sub_{ing}", placeholder="optional")
-    st.write(f"### {t['instructions']}")
-    for i, step in enumerate(recipe.get("instructions", []), 1):
-        st.write(f"{i}. {step}")
+    search = st.text_input(t["search_recipes"], placeholder="Type recipe name...")
+    recipe_names = list(SAMPLE_RECIPES.keys())
+    if search:
+        filtered = [r for r in recipe_names if search.lower() in r.lower()]
+    else:
+        filtered = recipe_names
+
+    if filtered:
+        recipe_name = st.selectbox(t["choose_recipe"], filtered)
+        recipe = SAMPLE_RECIPES[recipe_name]
+        st.write(f"### {t['ingredients']}")
+        inventory_items = [i.lower() for i in inv["Item"].tolist()] if not inv.empty else []
+        for ing, details in recipe["ingredients"].items():
+            st.write(f"**{t['recommended']}:** {ing}")
+            found = next((acc for acc in details.get("acceptable", []) if any(acc in i for i in inventory_items)), None)
+            if found:
+                st.success(f"**{t['acceptable']}:** {found}")
+            else:
+                st.write(f"• {details['qty']} {details['unit']} {ing}")
+            if st.session_state.allow_subs:
+                st.text_input(t["use_instead"], key=f"sub_{ing}", placeholder="optional")
+        st.write(f"### {t['instructions']}")
+        for i, step in enumerate(recipe.get("instructions", []), 1):
+            st.write(f"{i}. {step}")
+    else:
+        st.info("No recipes match your search.")
 
 with tab3:
     st.subheader(t["missing_items"])
-    st.info(f"Shopping list for {st.session_state.current_place} (can be expanded).")
+    st.info(f"Shopping list for **{st.session_state.current_place}** only.")
 
 with tab4:
     st.subheader(t["recipes"])
@@ -265,8 +295,8 @@ with tab4:
 
 with tab5:
     st.subheader(t["helper_title"])
-    st.write(f"Managing inventory for: **{st.session_state.current_place}**")
-    st.write("Add more places in the sidebar (Home, Store, Cabin, etc.).")
-    st.write("Change quantities directly in the list. Delete with the button.")
+    st.write(f"Current place: **{st.session_state.current_place}**")
+    st.write("Inventory is completely separate for each place.")
+    st.write("Use the search box in Meal Plan to find recipes by typing.")
 
-st.caption("Multiple places (homes & stores) + easy quantity editing added.")
+st.caption("Recipe search + confirmed separate inventories per place.")
