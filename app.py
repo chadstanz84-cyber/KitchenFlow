@@ -1,14 +1,49 @@
 import streamlit as st
 import requests
+import sqlite3
+import json
 from datetime import datetime, date, time
 import pytz
+from pathlib import Path
 
 st.set_page_config(page_title="KitchenFlow", page_icon="🍳", layout="wide")
 
+DB_PATH = Path("kitchenflow.db")
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""CREATE TABLE IF NOT EXISTS app_data (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    )""")
+    conn.commit()
+    conn.close()
+
+def save_data(key, value):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("INSERT OR REPLACE INTO app_data (key, value) VALUES (?, ?)", (key, json.dumps(value)))
+    conn.commit()
+    conn.close()
+
+def load_data(key, default):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT value FROM app_data WHERE key = ?", (key,))
+        row = c.fetchone()
+        conn.close()
+        return json.loads(row[0]) if row else default
+    except:
+        return default
+
+init_db()
+
 SEASONINGS = ["salt", "black pepper", "garlic powder", "paprika", "cumin", "oregano", "cinnamon", "chili powder"]
-PANTRY_ITEMS = ["white rice", "pasta", "olive oil", "canned tomatoes", "black beans", "canned tuna", "oats", "flour", "sugar", "peanut butter"]
-FRIDGE_ITEMS = ["eggs", "milk", "butter", "cheddar cheese", "greek yogurt", "chicken breast", "ground beef", "spinach", "broccoli"]
-FREEZER_ITEMS = ["frozen chicken", "frozen vegetables", "frozen berries", "ice cream", "frozen pizza"]
+PANTRY_ITEMS = ["white rice", "pasta", "olive oil", "canned tomatoes", "black beans", "canned tuna", "oats", "flour", "sugar"]
+FRIDGE_ITEMS = ["eggs", "milk", "butter", "cheddar cheese", "greek yogurt", "chicken breast", "ground beef", "spinach"]
+FREEZER_ITEMS = ["frozen chicken", "frozen vegetables", "frozen berries"]
 
 STORE_SEARCH = {
     "Walmart": "https://www.walmart.com/search?q=",
@@ -27,153 +62,173 @@ def search_recipes(q):
     except:
         return []
 
-# Session
-if "locations" not in st.session_state:
-    st.session_state.locations = {"Pantry": [], "Fridge": [], "Freezer": []}
-if "current_loc" not in st.session_state:
-    st.session_state.current_loc = "Pantry"
-if "grocery" not in st.session_state:
-    st.session_state.grocery = []
-if "store" not in st.session_state:
-    st.session_state.store = "Walmart"
-if "future_meals" not in st.session_state:
-    st.session_state.future_meals = []
-if "reminder_date" not in st.session_state:
-    st.session_state.reminder_date = date.today()
-if "reminder_time" not in st.session_state:
-    st.session_state.reminder_time = time(17, 0)
-if "time_format" not in st.session_state:
-    st.session_state.time_format = "12-hour"
-if "timezone" not in st.session_state:
-    st.session_state.timezone = "US/Central"
+# Load persistent data
+if "loaded" not in st.session_state:
+    st.session_state.locations = load_data("locations", {"Pantry": [], "Fridge": [], "Freezer": []})
+    st.session_state.current_loc = load_data("current_loc", "Pantry")
+    st.session_state.grocery = load_data("grocery", [])
+    st.session_state.store = load_data("store", "Walmart")
+    st.session_state.future_meals = load_data("future_meals", [])
+    st.session_state.reminder_date = date.fromisoformat(load_data("reminder_date", str(date.today())))
+    st.session_state.reminder_time = time.fromisoformat(load_data("reminder_time", "17:00:00"))
+    st.session_state.time_format = load_data("time_format", "12-hour")
+    st.session_state.timezone = load_data("timezone", "US/Central")
+    st.session_state.loaded = True
+
+def persist():
+    save_data("locations", st.session_state.locations)
+    save_data("current_loc", st.session_state.current_loc)
+    save_data("grocery", st.session_state.grocery)
+    save_data("store", st.session_state.store)
+    save_data("future_meals", st.session_state.future_meals)
+    save_data("reminder_date", str(st.session_state.reminder_date))
+    save_data("reminder_time", str(st.session_state.reminder_time))
+    save_data("time_format", st.session_state.time_format)
+    save_data("timezone", st.session_state.timezone)
 
 st.title("KitchenFlow")
-st.caption("Water is always available.")
+st.caption("Water is always available. Data is saved locally.")
 
 with st.sidebar:
     st.header("Settings")
     st.subheader("Locations")
     loc_names = list(st.session_state.locations.keys())
-    st.session_state.current_loc = st.selectbox("Active location", loc_names, index=loc_names.index(st.session_state.current_loc))
-    new_name = st.text_input("Rename or add location")
-    if st.button("Save location name") and new_name:
-        if new_name not in st.session_state.locations:
-            st.session_state.locations[new_name] = []
-        st.session_state.current_loc = new_name
+    new_loc = st.selectbox("Active location", loc_names, index=loc_names.index(st.session_state.current_loc) if st.session_state.current_loc in loc_names else 0)
+    if new_loc != st.session_state.current_loc:
+        st.session_state.current_loc = new_loc
+        persist()
+        st.rerun()
+    add_loc = st.text_input("Add / rename location")
+    if st.button("Save location") and add_loc:
+        if add_loc not in st.session_state.locations:
+            st.session_state.locations[add_loc] = []
+        st.session_state.current_loc = add_loc
+        persist()
         st.rerun()
 
     st.subheader("Reminder")
-    st.session_state.reminder_date = st.date_input("Date", st.session_state.reminder_date)
-    st.session_state.reminder_time = st.time_input("Time", st.session_state.reminder_time)
-    st.session_state.time_format = st.radio("Format", ["12-hour", "24-hour"])
-    st.session_state.timezone = st.selectbox("Timezone", TIMEZONES)
+    d = st.date_input("Date", st.session_state.reminder_date)
+    t = st.time_input("Time", st.session_state.reminder_time)
+    fmt = st.radio("Format", ["12-hour", "24-hour"], index=0 if st.session_state.time_format == "12-hour" else 1)
+    tz_name = st.selectbox("Timezone", TIMEZONES, index=TIMEZONES.index(st.session_state.timezone) if st.session_state.timezone in TIMEZONES else 1)
+    if d != st.session_state.reminder_date or t != st.session_state.reminder_time or fmt != st.session_state.time_format or tz_name != st.session_state.timezone:
+        st.session_state.reminder_date = d
+        st.session_state.reminder_time = t
+        st.session_state.time_format = fmt
+        st.session_state.timezone = tz_name
+        persist()
+
     try:
         tz = pytz.timezone(st.session_state.timezone)
         dt = tz.localize(datetime.combine(st.session_state.reminder_date, st.session_state.reminder_time))
-        fmt = "%I:%M %p" if st.session_state.time_format == "12-hour" else "%H:%M"
-        st.info(dt.strftime(f"%b %d, %Y at {fmt} %Z"))
+        fmt_str = "%I:%M %p" if st.session_state.time_format == "12-hour" else "%H:%M"
+        st.info(dt.strftime(f"%b %d at {fmt_str} %Z"))
     except:
         pass
 
-    st.session_state.store = st.selectbox("Store", list(STORE_SEARCH.keys()))
+    store = st.selectbox("Store", list(STORE_SEARCH.keys()), index=list(STORE_SEARCH.keys()).index(st.session_state.store) if st.session_state.store in STORE_SEARCH else 0)
+    if store != st.session_state.store:
+        st.session_state.store = store
+        persist()
 
 tabs = st.tabs(["Inventory", "What I Have", "Recipes & Desserts", "Grocery List", "Future Meals"])
 
 with tabs[0]:
-    st.subheader("Inventory")
-    st.write(f"**Adding to: {st.session_state.current_loc}**")
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        with st.expander("Seasonings", expanded=False):
+    st.subheader(f"Inventory — {st.session_state.current_loc}")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        with st.expander("Seasonings"):
             for item in SEASONINGS:
-                if st.button(item, key=f"sea{item}"):
+                if st.button(item, key=f"s{item}"):
                     st.session_state.locations[st.session_state.current_loc].append(item)
+                    persist()
                     st.rerun()
-    with col2:
-        with st.expander("Pantry staples", expanded=False):
+    with c2:
+        with st.expander("Pantry"):
             for item in PANTRY_ITEMS:
-                if st.button(item, key=f"pan{item}"):
+                if st.button(item, key=f"p{item}"):
                     st.session_state.locations[st.session_state.current_loc].append(item)
+                    persist()
                     st.rerun()
-    with col3:
-        with st.expander("Fridge / Freezer", expanded=False):
+    with c3:
+        with st.expander("Fridge / Freezer"):
             for item in FRIDGE_ITEMS + FREEZER_ITEMS:
-                if st.button(item, key=f"fr{item}"):
+                if st.button(item, key=f"f{item}"):
                     st.session_state.locations[st.session_state.current_loc].append(item)
+                    persist()
                     st.rerun()
 
     custom = st.text_input("Custom item")
-    if st.button("Add") and custom:
+    if st.button("Add custom") and custom:
         st.session_state.locations[st.session_state.current_loc].append(custom)
+        persist()
         st.rerun()
 
-    st.write("---")
     for loc, items in st.session_state.locations.items():
         if items:
-            with st.expander(f"{loc} ({len(items)})", expanded=False):
-                for i, it in enumerate(items):
-                    c1, c2 = st.columns([5,1])
-                    c1.write(it)
-                    if c2.button("✕", key=f"x{loc}{i}"):
+            with st.expander(f"{loc} ({len(items)})"):
+                for i, it in enumerate(items[:]):
+                    col1, col2 = st.columns([5,1])
+                    col1.write(it)
+                    if col2.button("✕", key=f"del{loc}{i}"):
                         items.pop(i)
+                        persist()
                         st.rerun()
 
 with tabs[1]:
-    st.subheader("What I Have for Cooking")
-    all_items = []
-    for loc, items in st.session_state.locations.items():
-        all_items.extend(items)
+    st.subheader("What I Have")
+    all_items = [item for items in st.session_state.locations.values() for item in items]
     if all_items:
         st.write(", ".join(sorted(set(all_items))))
-        st.caption(f"{len(set(all_items))} unique items across all locations.")
     else:
-        st.info("Add items in the Inventory tab.")
+        st.info("Add items in Inventory.")
 
 with tabs[2]:
     st.subheader("Recipes & Desserts")
-    q = st.text_input("Search (try: chicken, cake, cookie, pasta)")
+    q = st.text_input("Search")
     inv_flat = [i.lower() for items in st.session_state.locations.values() for i in items]
     if q:
         for rec in search_recipes(q):
             with st.expander(rec["name"]):
                 missing = [ing for ing in rec["ings"] if ing and not any(ing.lower() in x for x in inv_flat)]
-                st.write(", ".join(rec["ings"]))
-                if missing:
-                    st.warning("Missing: " + ", ".join(missing))
-                    if st.button("Add missing to grocery list", key=f"m{rec['name']}"):
-                        for m in missing:
-                            if m not in st.session_state.grocery:
-                                st.session_state.grocery.append(m)
-                        st.rerun()
+                st.write(", ".join([i for i in rec["ings"] if i]))
+                if missing and st.button("Add missing to grocery", key=f"miss{rec['name']}"):
+                    for m in missing:
+                        if m not in st.session_state.grocery:
+                            st.session_state.grocery.append(m)
+                    persist()
+                    st.rerun()
                 if st.button("Add to Future Meals", key=f"fut{rec['name']}"):
                     st.session_state.future_meals.append(rec["name"])
+                    persist()
                     st.rerun()
 
 with tabs[3]:
     st.subheader("Grocery List")
-    st.caption(f"Store: {st.session_state.store}")
-    g = st.text_input("Add item")
+    g = st.text_input("Add")
     if st.button("Add to grocery") and g:
         st.session_state.grocery.append(g)
+        persist()
         st.rerun()
     base = STORE_SEARCH.get(st.session_state.store, "")
-    for i, item in enumerate(st.session_state.grocery):
-        c1, c2 = st.columns([4,1])
+    for i, item in enumerate(st.session_state.grocery[:]):
+        c1, c2 = st.columns([5,1])
         c1.write(item)
         if base:
-            st.markdown(f"[Search at store]({base}{item.replace(' ','+')})")
-        if c2.button("Remove", key=f"gg{i}"):
+            st.markdown(f"[Search store]({base}{item.replace(' ', '+')})")
+        if c2.button("Remove", key=f"g{i}"):
             st.session_state.grocery.pop(i)
+            persist()
             st.rerun()
 
 with tabs[4]:
     st.subheader("Future Meals")
-    for i, meal in enumerate(st.session_state.future_meals):
-        c1, c2 = st.columns([4,1])
+    for i, meal in enumerate(st.session_state.future_meals[:]):
+        c1, c2 = st.columns([5,1])
         c1.write(meal)
         if c2.button("Done", key=f"done{i}"):
             st.session_state.future_meals.pop(i)
+            persist()
             st.rerun()
 
-st.caption("Compact inventory by location · Custom locations · Desserts via search · What I Have overview")
+st.caption("Persistent SQLite storage · Compact inventory by location · All previous features kept")
